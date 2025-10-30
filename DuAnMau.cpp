@@ -24,7 +24,7 @@ int main() {
     // Load ảnh
     sf::Texture textures[8];
     for (int i = 0; i < 8; i++)
-        textures[i].loadFromFile("C:/Users/Edu/source/repos/DuAnMau - Copy/x64/Debug/images/" + std::to_string(i) + ".jpg");
+        textures[i].loadFromFile("images/" + std::to_string(i) + ".jpg");
 
     // Tạo danh sách id (2 thẻ cho mỗi hình)
     std::vector<int> ids;
@@ -80,6 +80,26 @@ int main() {
         cards.push_back(c);
     }
 
+    sf::Font font;
+    if (!font.loadFromFile("font/arial.ttf")) {
+        return -1;
+    }
+
+    sf::Text winMessage;
+    winMessage.setFont(font);
+    winMessage.setString(L"CHÚC MỪNG! BẠN ĐÃ THẮNG!");
+    winMessage.setCharacterSize(40);
+    winMessage.setFillColor(sf::Color::Red);
+    winMessage.setStyle(sf::Text::Bold);
+
+    //Căn giữa thông báo trên màn hình
+    sf::FloatRect textRect = winMessage.getLocalBounds();
+    winMessage.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
+    winMessage.setPosition(sf::Vector2f(800/2.0f, 600/2.0f));
+
+    int matchedPairs = 0;
+    bool gameWon = false;
+
     int first = -1, second = -1;
     sf::Clock timer;
     bool waiting = false;
@@ -133,14 +153,19 @@ int main() {
         }
 
         if (waiting && timer.getElapsedTime().asSeconds() > 1) {
-            if (cards[first].id == cards[second].id)
+            if (cards[first].id == cards[second].id) {
                 cards[first].matched = cards[second].matched = true;
+                matchedPairs++;
+            }
             else
                 cards[first].revealed = cards[second].revealed = false;
                 cards[first].showingFront = cards[second].showingFront = false;
 
             first = second = -1;
             waiting = false;
+        }
+        if (!gameWon & matchedPairs == 8) {
+            gameWon = true;
         }
 
         //Vẽ
@@ -178,6 +203,9 @@ int main() {
 
                 window.draw(c.back);
             }
+        }
+        if (gameWon) {
+            window.draw(winMessage);
         }
         window.display();
     }
