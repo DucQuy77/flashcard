@@ -2,7 +2,27 @@
 #include <vector>
 #include <ctime>
 #include <algorithm>
+#include <iostream>
+#include <mysql/jdbc.h>
 
+using namespace std;
+
+sql::Driver* driver = nullptr;
+sql::Connection* conn = nullptr;
+
+
+static void connectDb(){
+    try {
+        driver = sql::mysql::get_mysql_driver_instance();
+        conn = driver->connect("tcp://127.0.0.1:3306", "root", ""); // sửa password nếu cần
+        conn->setSchema("flashcard");
+        std::cout << "Connect successfully!\n";
+    }
+    catch (sql::SQLException& e) {
+        std::cout << "Error: " << e.what() << std::endl;
+        //std::cout << "ErrorCode: " << e.getErrorCode() << " SQLState: " << e.getSQLState() << std::endl;
+    }
+}
 struct Card {
     sf::Sprite sprite;
     sf::RectangleShape back;
@@ -18,7 +38,8 @@ struct Card {
 };
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Flashcard Match Game");
+    connectDb();
+    sf::RenderWindow window(sf::VideoMode(1300, 600), "Flashcard Match Game");
     window.setFramerateLimit(60);
 
     // Load ảnh
@@ -43,7 +64,7 @@ int main() {
 
     float totalWidth = 4 * cardWidth + 3 * spacing;
     float totalHeight = 4 * cardHeight + 3 * spacing;
-    float startX = (800 - totalWidth) / 2;
+    float startX = (1300 - totalWidth) / 2;
     float startY = (600 - totalHeight) / 2;
 
     for (int i = 0; i < 16; i++) {
@@ -92,6 +113,30 @@ int main() {
     winMessage.setFillColor(sf::Color::Red);
     winMessage.setStyle(sf::Text::Bold);
 
+    sf::Text turnText;
+    turnText.setFont(font);
+    turnText.setCharacterSize(40);
+    turnText.setPosition(1100, 10);
+    turnText.setFillColor(sf::Color::Red);
+    turnText.setStyle(sf::Text::Bold);
+
+    sf::Text ruleText;
+    ruleText.setFont(font);
+    ruleText.setCharacterSize(20);
+    ruleText.setFillColor(sf::Color::Red);
+    ruleText.setPosition(20, 50);
+
+    //Nội dung luật chơi
+    ruleText.setString(
+        "LUAT CHOI:\n"
+        "- Click de lat 2 la bai.\n"
+        "- Neu trung nhau -> cap bai bien mat.\n"
+        "- Neu sai -> lat lai sau 1 giay.\n"
+        "- Hoan thanh khi lat het tat ca cap bai.\n"
+        "- Dem so luot lat cap bai o goc tren.\n"
+    );
+
+
     //Căn giữa thông báo trên màn hình
     sf::FloatRect textRect = winMessage.getLocalBounds();
     winMessage.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
@@ -99,10 +144,10 @@ int main() {
 
     int matchedPairs = 0;
     bool gameWon = false;
-
     int first = -1, second = -1;
     sf::Clock timer;
     bool waiting = false;
+    int turnCount = 0;
 
     while (window.isOpen()) {
         sf::Event e;
@@ -112,12 +157,18 @@ int main() {
         if (!waiting && sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
             sf::Vector2f mouse(sf::Mouse::getPosition(window));
             for (int i = 0; i < cards.size(); i++) {
-                if (cards[i].matched || cards[i].revealed) {
-                    continue;
-                }
-
-                if (cards[i].back.getGlobalBounds().contains(mouse)) {
+                if (cards[i].back.getGlobalBounds().contains(mouse) && !cards[i].revealed && !cards[i].matched) {
+                    cards[i].revealed = true;
                     cards[i].flipping = true;
+                    
+                    if (first == -1) {
+                        first = i;
+                    }
+                    else if (second == -1 && i != first) {
+                        second = i;
+                        waiting = true;
+                        timer.restart();
+                    }
                     break;
                 }
             }
@@ -153,6 +204,7 @@ int main() {
         }
 
         if (waiting && timer.getElapsedTime().asSeconds() > 1) {
+            turnCount++;
             if (cards[first].id == cards[second].id) {
                 cards[first].matched = cards[second].matched = true;
                 matchedPairs++;
@@ -164,12 +216,15 @@ int main() {
             first = second = -1;
             waiting = false;
         }
-        if (!gameWon & matchedPairs == 8) {
+        if (!gameWon && matchedPairs == 8) {
             gameWon = true;
         }
 
+        turnText.setString("Turns: " + std::to_string(turnCount));
+
         //Vẽ
         window.clear(sf::Color::White);
+        window.draw(ruleText);
         for (auto& c : cards) {
             if (c.matched) continue;
 
@@ -207,6 +262,7 @@ int main() {
         if (gameWon) {
             window.draw(winMessage);
         }
+        window.draw(turnText);
         window.display();
     }
 }
